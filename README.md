@@ -1,4 +1,4 @@
-# 📊 Chart Explainer AI
+# Chart Explainer AI
 
 A multimodal AI app that analyzes any chart or graph and returns structured, analyst-quality insights — powered by Claude's vision capabilities.
 
