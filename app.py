@@ -322,6 +322,10 @@ def get_model():
     return genai.GenerativeModel("gemini-2.5-flash")
 
 
+DOMAIN_RESTRICTION = """STRICT RULE: You are exclusively a chart and data visualization analysis assistant. If the user's message is unrelated to the chart, its data, or data analysis in general, do not answer it. Instead respond only with: "I'm designed specifically for chart and data visualization analysis and can only assist with related questions." Apply this rule before answering anything.
+
+"""
+
 ANALYSIS_PROMPT = """You are an expert data analyst. Analyze this chart clearly and concisely.
 
 **What it shows**
@@ -370,7 +374,7 @@ def generate_response(
 
     # ── Compare mode (two images) ──
     if image and image2:
-        prompt = COMPARISON_PROMPT
+        prompt = DOMAIN_RESTRICTION + COMPARISON_PROMPT
         if message and message not in ("Compare these charts.", ""):
             prompt += f"\n\nAlso specifically address: {message}"
         return model.generate_content(["Chart 1:", image, "Chart 2:", image2, prompt]).text
@@ -386,13 +390,14 @@ def generate_response(
     # First analysis of a new single image → structured format
     is_first = image is not None and not any(m["role"] == "assistant" for m in history)
     if is_first:
-        prompt = ANALYSIS_PROMPT
+        prompt = DOMAIN_RESTRICTION + ANALYSIS_PROMPT
         if message and message not in ("Analyze this chart.", ""):
             prompt += f"\n\nAlso specifically address: {message}"
         return model.generate_content([prompt, image]).text
 
     # Conversational follow-up
     parts = [
+        DOMAIN_RESTRICTION +
         "You are an expert data analyst. Answer the user's questions about this chart concisely "
         "and specifically, referencing values or patterns visible in the chart."
     ]
