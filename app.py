@@ -1,316 +1,114 @@
-import streamlit as st
-import google.generativeai as genai
 import os
-from PIL import Image
 from typing import Optional, List
 
-st.set_page_config(
-    page_title="Chart Explainer AI",
-    page_icon="📊",
-    layout="wide",
-    initial_sidebar_state="collapsed",
-)
+import google.generativeai as genai
+import streamlit as st
+from PIL import Image
 
-# ── Theme ──────────────────────────────────────────────────────────────────────
+st.set_page_config(page_title="Chart Explainer AI", page_icon="📊", layout="wide", initial_sidebar_state="collapsed")
+
 if "theme" not in st.session_state:
-    st.session_state["theme"] = "dark"
-is_dark = st.session_state["theme"] == "dark"
+    st.session_state["theme"] = "light"
+if "messages" not in st.session_state:
+    st.session_state["messages"] = []
+if "upload_key" not in st.session_state:
+    st.session_state["upload_key"] = 0
+if "pending_image" not in st.session_state:
+    st.session_state["pending_image"] = None
 
-if is_dark:
-    C = {
-        "bg":             "#0d0d0d",
-        "surface":        "#171717",
-        "surface2":       "#202020",
-        "border":         "#2c2c2c",
-        "accent":         "#c9a84c",
-        "accent_dim":     "#6b5520",
-        "text":           "#edeae3",
-        "text_sub":       "#7a7060",
-        "text_muted":     "#4a4035",
-        "btn_bg":         "#c9a84c",
-        "btn_text":       "#0d0d0d",
-        "btn_hover":      "#dab95e",
-        "chip_bg":        "#1a1a1a",
-        "chip_border":    "#2c2c2c",
-        "chip_text":      "#7a7060",
-        "shadow":         "0 8px 48px rgba(0,0,0,0.9)",
-        "toggle_label":   "Day",
-        "next_theme":     "light",
-        "top_bar":        "linear-gradient(90deg,#c9a84c,#7a6330 50%,transparent)",
-    }
-else:
-    C = {
-        "bg":             "#f5f3ee",
-        "surface":        "#ffffff",
-        "surface2":       "#edeae2",
-        "border":         "#dedad0",
-        "accent":         "#7c3a00",
-        "accent_dim":     "#c9a84c",
-        "text":           "#1a1a1a",
-        "text_sub":       "#6b6355",
-        "text_muted":     "#9a9080",
-        "btn_bg":         "#1a1a1a",
-        "btn_text":       "#ffffff",
-        "btn_hover":      "#333333",
-        "chip_bg":        "#ffffff",
-        "chip_border":    "#dedad0",
-        "chip_text":      "#6b6355",
-        "shadow":         "0 4px 24px rgba(0,0,0,0.10)",
-        "toggle_label":   "Night",
-        "next_theme":     "dark",
-        "top_bar":        "linear-gradient(90deg,#7c3a00,#c9a84c 50%,transparent)",
-    }
+THEMES = {
+    "light": {
+        "bg": "#F8F6F1", "surface": "#FFFFFF", "surface2": "#F0EDE5", "border": "#E3DED3",
+        "accent": "#B8751A", "text": "#1C1A16", "text_sub": "#6B6355", "text_muted": "#A8A090",
+        "btn_bg": "#1C1A16", "btn_text": "#FFFFFF", "shadow_sm": "0 1px 3px rgba(0,0,0,0.06)",
+        "shadow_md": "0 4px 16px rgba(0,0,0,0.08)", "theme_label": "Dark mode", "next_theme": "dark",
+    },
+    "dark": {
+        "bg": "#111110", "surface": "#1A1917", "surface2": "#222120", "border": "#2E2C28",
+        "accent": "#C9913A", "text": "#EDE9E0", "text_sub": "#7A7060", "text_muted": "#4A4840",
+        "btn_bg": "#C9913A", "btn_text": "#111110", "shadow_sm": "0 1px 3px rgba(0,0,0,0.4)",
+        "shadow_md": "0 4px 16px rgba(0,0,0,0.5)", "theme_label": "Light mode", "next_theme": "light",
+    },
+}
+C = THEMES[st.session_state["theme"]]
 
-
-def inject_css(C):
-    st.markdown(f"""
+CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap');
-
-html, body, .stApp {{
-    background-color: {C['bg']} !important;
-    color: {C['text']} !important;
-    font-family: 'Inter', sans-serif !important;
-}}
-.main .block-container {{
-    max-width: 820px !important;
-    margin: 0 auto !important;
-    padding: 2rem 2rem 6rem !important;
-}}
-[data-testid="stDecoration"],
-footer {{ display:none !important; }}
-
-/* top accent bar */
-.top-bar {{
-    position:fixed;top:0;left:0;right:0;height:2px;
-    background:{C['top_bar']};z-index:9999;pointer-events:none;
-}}
-
-/* ── Typography ── */
-h1 {{
-    font-family:'Cinzel',serif !important;font-weight:700 !important;
-    letter-spacing:0.06em !important;font-size:2rem !important;
-    color:{C['text']} !important;margin:0 !important;line-height:1.25 !important;
-}}
-p,li {{
-    font-family:'Inter',sans-serif !important;
-    color:{C['text']} !important;font-size:0.9rem !important;line-height:1.8 !important;
-}}
-strong,b {{ color:{C['accent']} !important;font-weight:600 !important; }}
-
-/* ── App-bar (chat page) ── */
-.app-bar {{
-    display:flex;align-items:center;justify-content:space-between;
-    padding:14px 0 10px;
-    border-bottom:1px solid {C['border']};
-    margin-bottom:1.5rem;
-}}
-.app-bar-logo {{
-    font-family:'Cinzel',serif;font-size:0.9rem;
-    letter-spacing:0.18em;text-transform:uppercase;color:{C['text']};
-}}
-
-/* ── Landing input card ── */
-[data-testid="stForm"] {{
-    background:{C['surface']} !important;
-    border:1px solid {C['border']} !important;
-    border-radius:16px !important;
-    padding:20px 24px !important;
-}}
-[data-testid="stForm"] > div {{ gap:0 !important; }}
-
-/* text area inside form ── remove default border, transparent bg */
-[data-testid="stForm"] textarea {{
-    background:transparent !important;
-    border:none !important;
-    border-top:1px solid {C['border']} !important;
-    border-radius:0 !important;
-    color:{C['text']} !important;
-    font-family:'Inter',sans-serif !important;
-    font-size:0.95rem !important;
-    padding:14px 4px !important;
-    resize:none !important;
-    box-shadow:none !important;
-}}
-[data-testid="stForm"] textarea:focus {{
-    border-top-color:{C['accent']} !important;
-    box-shadow:none !important;
-}}
-[data-testid="stForm"] textarea::placeholder {{ color:{C['text_muted']} !important; }}
-
-/* file uploader inside form ── minimal */
-[data-testid="stForm"] [data-testid="stFileUploader"] > div:first-child {{
-    background:transparent !important;border:none !important;
-}}
-[data-testid="stForm"] [data-testid="stFileUploaderDropzone"] {{
-    background:{C['surface2']} !important;border:1px dashed {C['border']} !important;
-    border-radius:8px !important;padding:10px 16px !important;
-}}
-[data-testid="stForm"] [data-testid="stFileUploaderDropzoneInstructions"] p,
-[data-testid="stForm"] [data-testid="stFileUploaderDropzoneInstructions"] small {{
-    color:{C['text_muted']} !important;font-size:0.8rem !important;
-}}
-[data-testid="stForm"] [data-testid="stFileUploaderDropzone"] button {{
-    background:{C['surface']} !important;color:{C['text_muted']} !important;
-    border:1px solid {C['border']} !important;border-radius:4px !important;
-    font-size:0.76rem !important;
-}}
-[data-testid="stForm"] [data-testid="stFileUploaderDropzone"] button:hover {{
-    border-color:{C['accent']} !important;color:{C['accent']} !important;
-}}
-
-/* ── Buttons ── */
-.stButton > button[kind="primary"] {{
-    background-color:{C['btn_bg']} !important;color:{C['btn_text']} !important;
-    border:none !important;border-radius:8px !important;
-    font-family:'Inter',sans-serif !important;font-weight:600 !important;
-    font-size:0.82rem !important;letter-spacing:0.08em !important;
-    padding:12px 22px !important;transition:all 0.2s !important;
-}}
-.stButton > button[kind="primary"]:hover {{
-    background-color:{C['btn_hover']} !important;transform:translateY(-1px) !important;
-}}
-.stButton > button[kind="primary"] p,
-.stButton > button[kind="primary"] span {{
-    color:{C['btn_text']} !important;font-size:inherit !important;
-}}
-.stButton > button[kind="secondary"] {{
-    background:transparent !important;color:{C['text_sub']} !important;
-    border:1px solid {C['border']} !important;border-radius:8px !important;
-    font-family:'Inter',sans-serif !important;font-size:0.78rem !important;
-    letter-spacing:0.06em !important;padding:8px 16px !important;transition:all 0.2s !important;
-}}
-.stButton > button[kind="secondary"]:hover {{
-    border-color:{C['accent']} !important;color:{C['accent']} !important;
-}}
-.stButton > button[kind="secondary"] p,
-.stButton > button[kind="secondary"] span {{ color:inherit !important;font-size:inherit !important; }}
-
-/* submit button inside form */
-[data-testid="stForm"] .stButton > button {{
-    border-radius:8px !important;
-}}
-[data-testid="stFormSubmitButton"] > button {{
-    background-color:{C['btn_bg']} !important;color:{C['btn_text']} !important;
-    border:none !important;border-radius:8px !important;
-    font-family:'Inter',sans-serif !important;font-weight:600 !important;
-    font-size:0.82rem !important;padding:12px 22px !important;
-}}
-[data-testid="stFormSubmitButton"] > button p,
-[data-testid="stFormSubmitButton"] > button span {{ color:{C['btn_text']} !important; }}
-[data-testid="stFormSubmitButton"] > button:hover {{
-    background-color:{C['btn_hover']} !important;
-}}
-
-/* ── Suggestion chips ── */
-.chip-btn > button {{
-    background:{C['chip_bg']} !important;color:{C['chip_text']} !important;
-    border:1px solid {C['chip_border']} !important;border-radius:24px !important;
-    font-size:0.78rem !important;padding:8px 16px !important;letter-spacing:0.03em !important;
-    transition:all 0.2s !important;
-}}
-.chip-btn > button:hover {{
-    border-color:{C['accent']} !important;color:{C['accent']} !important;background:{C['surface']} !important;
-}}
-.chip-btn > button p,.chip-btn > button span {{ color:inherit !important;font-size:inherit !important; }}
-
-/* ── Chat messages ── */
-[data-testid="stChatMessage"] {{
-    background:transparent !important;border:none !important;padding:6px 0 !important;
-}}
-[data-testid="stChatMessageContent"] p {{
-    font-size:0.9rem !important;line-height:1.8 !important;color:{C['text']} !important;
-}}
-
-/* ── Chat input (bottom) ── */
-.stChatInputContainer {{
-    background:{C['bg']} !important;border-top:1px solid {C['border']} !important;
-    padding-top:12px !important;
-}}
-[data-testid="stChatInput"] textarea {{
-    background:{C['surface']} !important;color:{C['text']} !important;
-    border:1px solid {C['border']} !important;border-radius:12px !important;
-    font-family:'Inter',sans-serif !important;font-size:0.9rem !important;
-}}
-[data-testid="stChatInput"] textarea:focus {{
-    border-color:{C['accent']} !important;
-    box-shadow:0 0 0 2px {C['accent_dim']}33 !important;
-}}
-[data-testid="stChatInput"] textarea::placeholder {{ color:{C['text_muted']} !important; }}
-
-/* ── Compact attach uploader (chat view) ── */
-.attach-area [data-testid="stFileUploader"] > div:first-child {{
-    background:transparent !important;border:none !important;
-}}
-.attach-area [data-testid="stFileUploaderDropzone"] {{
-    background:{C['surface']} !important;border:1px dashed {C['border']} !important;
-    border-radius:8px !important;padding:8px 14px !important;
-}}
-.attach-area [data-testid="stFileUploaderDropzoneInstructions"] p,
-.attach-area [data-testid="stFileUploaderDropzoneInstructions"] small {{
-    color:{C['text_muted']} !important;font-size:0.76rem !important;
-}}
-.attach-area [data-testid="stFileUploaderDropzone"] button {{
-    background:{C['surface']} !important;color:{C['text_muted']} !important;
-    border:1px solid {C['border']} !important;border-radius:4px !important;font-size:0.74rem !important;
-}}
-.attach-area [data-testid="stFileUploaderDropzone"] button:hover {{
-    border-color:{C['accent']} !important;color:{C['accent']} !important;
-}}
-
-/* ── Mode radio (segmented control look) ── */
-[data-testid="stRadio"] > div {{
-    display:flex;gap:8px;
-}}
-[data-testid="stRadio"] label {{
-    background:{C['surface']} !important;
-    border:1px solid {C['border']} !important;
-    border-radius:8px !important;
-    padding:8px 20px !important;
-    font-family:'Inter',sans-serif !important;
-    font-size:0.8rem !important;
-    letter-spacing:0.06em !important;
-    color:{C['text_sub']} !important;
-    cursor:pointer !important;
-    transition:all 0.2s !important;
-}}
-[data-testid="stRadio"] label:has(input:checked) {{
-    background:{C['btn_bg']} !important;
-    border-color:{C['btn_bg']} !important;
-    color:{C['btn_text']} !important;
-}}
-[data-testid="stRadio"] label span {{ color:inherit !important; }}
-[data-testid="stRadio"] [data-testid="stMarkdownContainer"] p {{
-    color:inherit !important;font-size:inherit !important;
-}}
-
-/* ── Misc ── */
-hr {{ border:none !important;border-top:1px solid {C['border']} !important;margin:1.5rem 0 !important; }}
-.stCaption p {{ color:{C['text_muted']} !important;font-size:0.74rem !important; }}
-[data-testid="stImage"] img {{ border-radius:8px !important;border:1px solid {C['border']} !important; }}
-.stSpinner > div > div {{ border-top-color:{C['accent']} !important; }}
-::-webkit-scrollbar {{ width:5px;height:5px; }}
-::-webkit-scrollbar-track {{ background:{C['bg']}; }}
-::-webkit-scrollbar-thumb {{ background:{C['border']};border-radius:3px; }}
-::-webkit-scrollbar-thumb:hover {{ background:{C['accent_dim']}; }}
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display&display=swap');
+:root { --bg: __bg__; --surface: __surface__; --surface2: __surface2__; --border: __border__; --accent: __accent__; --text: __text__; --text-sub: __text_sub__; --text-muted: __text_muted__; --btn-bg: __btn_bg__; --btn-text: __btn_text__; --shadow-sm: __shadow_sm__; --shadow-md: __shadow_md__; --radius: 14px; --radius-sm: 8px; }
+html, body, .stApp { background: var(--bg) !important; color: var(--text) !important; font-family: 'DM Sans', sans-serif !important; }
+.main .block-container { max-width: 720px !important; padding: 0 24px 36px !important; margin: 0 auto !important; }
+[data-testid="stHeader"], [data-testid="stToolbar"], [data-testid="stDecoration"], footer { display: none !important; }
+* { font-family: 'DM Sans', sans-serif !important; }
+h1, .serif-title { font-family: 'DM Serif Display', serif !important; }
+p, li, label, span { color: var(--text) !important; }
+strong, b { color: var(--accent) !important; font-weight: 600 !important; }
+.topbar { display: flex; align-items: center; justify-content: space-between; padding: 20px 0 16px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+.topbar-logo { font-family: 'DM Serif Display', serif !important; font-size: 1rem; letter-spacing: .02em; color: var(--text) !important; }
+.landing-body { min-height: calc(100vh - 440px); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 28px 0 32px; }
+.landing-kicker { font-size: .95rem; color: var(--text-sub) !important; margin: 0 0 6px; text-align: center; }
+.landing-headline { font-family: 'DM Serif Display', serif !important; font-size: 2.4rem; color: var(--text) !important; line-height: 1.15; margin: 0 0 8px; text-align: center; font-weight: 400 !important; }
+.landing-sub { font-size: 1rem; color: var(--text-sub) !important; text-align: center; margin: 0 0 34px; }
+.landing-card { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 24px; box-shadow: var(--shadow-md); width: 100%; }
+.label-small { font-size: .72rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--text-muted) !important; margin-bottom: 8px; }
+.card-divider { height: 1px; background: var(--border); margin: 14px -24px; }
+.char-hint { font-size: .75rem; color: var(--text-muted) !important; padding-top: 8px; }
+[data-testid="stForm"] { background: transparent !important; border: 0 !important; padding: 0 !important; }
+[data-testid="stForm"] > div { gap: 0 !important; }
+[data-testid="stFileUploader"] { margin-bottom: 0 !important; }
+[data-testid="stFileUploader"] > div:first-child { background: transparent !important; border: 0 !important; }
+[data-testid="stFileUploaderDropzone"] { background: var(--surface) !important; border: 1.5px dashed var(--border) !important; border-radius: var(--radius) !important; padding: 28px 20px !important; min-height: 118px !important; transition: all .2s !important; }
+[data-testid="stFileUploaderDropzone"]:hover { border-color: var(--accent) !important; }
+[data-testid="stFileUploaderDropzoneInstructions"] p, [data-testid="stFileUploaderDropzoneInstructions"] small { color: var(--text-muted) !important; font-size: .8rem !important; }
+[data-testid="stFileUploaderDropzone"] button { background: var(--surface2) !important; color: var(--text-sub) !important; border: 1px solid var(--border) !important; border-radius: 8px !important; font-size: .78rem !important; padding: 7px 14px !important; }
+[data-testid="stFileUploaderDropzone"] button:hover { color: var(--accent) !important; border-color: var(--accent) !important; }
+textarea { background: transparent !important; color: var(--text) !important; border: none !important; border-radius: 0 !important; font-size: .9rem !important; line-height: 1.6 !important; box-shadow: none !important; resize: none !important; }
+textarea::placeholder { color: var(--text-muted) !important; }
+[data-testid="stTextArea"] { margin-top: 0 !important; }
+[data-testid="stTextArea"] > div { background: transparent !important; }
+[data-testid="stTextArea"] textarea { min-height: 56px !important; padding: 2px 0 !important; }
+[data-testid="stRadio"] > div { display: flex !important; background: var(--surface2) !important; border: 1px solid var(--border) !important; border-radius: 10px !important; padding: 3px !important; gap: 2px !important; margin: 0 auto 24px !important; max-width: 380px !important; }
+[data-testid="stRadio"] label { flex: 1 !important; justify-content: center !important; padding: 9px 16px !important; border-radius: 8px !important; cursor: pointer !important; transition: all .2s !important; }
+[data-testid="stRadio"] label:has(input:checked) { background: var(--surface) !important; box-shadow: var(--shadow-sm) !important; }
+[data-testid="stRadio"] label p { color: var(--text-sub) !important; font-size: .85rem !important; font-weight: 500 !important; }
+[data-testid="stRadio"] label:has(input:checked) p { color: var(--text) !important; }
+.stButton > button, [data-testid="stFormSubmitButton"] > button { border-radius: var(--radius-sm) !important; font-weight: 500 !important; font-size: .875rem !important; transition: all .2s !important; min-height: 38px !important; white-space: nowrap !important; }
+.stButton > button[kind="primary"], [data-testid="stFormSubmitButton"] > button { background: var(--btn-bg) !important; color: var(--btn-text) !important; border: none !important; box-shadow: var(--shadow-sm) !important; }
+.stButton > button[kind="primary"]:hover, [data-testid="stFormSubmitButton"] > button:hover { opacity: .88 !important; transform: translateY(-1px) !important; box-shadow: var(--shadow-md) !important; }
+.stButton > button[kind="secondary"] { background: transparent !important; color: var(--text-sub) !important; border: 1px solid var(--border) !important; }
+.stButton > button[kind="secondary"]:hover { border-color: var(--accent) !important; color: var(--accent) !important; }
+.stButton > button p, .stButton > button span, [data-testid="stFormSubmitButton"] p, [data-testid="stFormSubmitButton"] span { color: inherit !important; font-size: inherit !important; }
+.preview-wrap img, [data-testid="stImage"] img { border: 1px solid var(--border) !important; border-radius: var(--radius) !important; background: var(--surface2) !important; }
+[data-testid="stChatMessage"] { background: transparent !important; padding: 8px 0 !important; }
+[data-testid="stChatMessageContent"] { background: var(--surface) !important; border: 1px solid var(--border) !important; border-radius: 14px !important; padding: 13px 16px !important; box-shadow: var(--shadow-sm) !important; }
+[data-testid="stChatMessageContent"] p, [data-testid="stChatMessageContent"] li { color: var(--text) !important; font-size: .875rem !important; line-height: 1.75 !important; }
+[data-testid="stChatInput"] textarea { background: var(--surface) !important; border: 1px solid var(--border) !important; border-radius: 14px !important; color: var(--text) !important; }
+.stChatInputContainer { background: var(--bg) !important; border-top: 1px solid var(--border) !important; padding-top: 14px !important; }
+.attach-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin: 12px 0 10px; }
+.attach-card p { margin: 0 0 8px !important; font-size: .72rem !important; letter-spacing: .1em !important; text-transform: uppercase !important; color: var(--text-muted) !important; font-weight: 600 !important; }
+.sample-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 24px; flex-wrap: wrap; }
+.sample-label { font-size: .75rem; color: var(--text-muted) !important; font-weight: 500; letter-spacing: .04em; }
+.footer-note { text-align: center; font-size: .68rem; color: var(--text-muted) !important; letter-spacing: .1em; margin-top: 2rem; }
+hr { border: none !important; border-top: 1px solid var(--border) !important; }
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+@media(max-width: 600px) { .main .block-container { padding: 0 16px 32px !important; } .landing-headline { font-size: 2rem !important; } }
 </style>
-""", unsafe_allow_html=True)
+"""
 
+for key, value in C.items():
+    CSS = CSS.replace(f"__{key}__", value)
+st.markdown(CSS, unsafe_allow_html=True)
 
-inject_css(C)
-st.markdown('<div class="top-bar"></div>', unsafe_allow_html=True)
-
-
-# ── Gemini ─────────────────────────────────────────────────────────────────────
 @st.cache_resource
 def get_model():
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
-        st.error("GEMINI_API_KEY not found. Run: export GEMINI_API_KEY='your-key'")
+        st.error("GEMINI_API_KEY not found. Add it as a Streamlit secret or environment variable.")
         st.stop()
     genai.configure(api_key=api_key)
     return genai.GenerativeModel("gemini-2.5-flash")
-
 
 ANALYSIS_PROMPT = """You are an expert data analyst. Analyze this chart clearly and concisely.
 
@@ -327,7 +125,6 @@ One standout insight: an outlier, anomaly, or something a casual reader might mi
 What should a decision-maker do or conclude? Keep it practical and actionable.
 
 Be specific. Avoid vague statements."""
-
 
 COMPARISON_PROMPT = """You are an expert data analyst comparing two charts.
 
@@ -349,23 +146,14 @@ What story do these two charts tell together that neither tells alone?
 **Recommendation**
 What conclusion or action should the reader take based on both charts?"""
 
-
-def generate_response(
-    message: str,
-    image: Optional[Image.Image],
-    history: List[dict],
-    image2: Optional[Image.Image] = None,
-) -> str:
+def generate_response(message: str, image: Optional[Image.Image], history: List[dict], image2: Optional[Image.Image] = None) -> str:
     model = get_model()
-
-    # ── Compare mode (two images) ──
     if image and image2:
         prompt = COMPARISON_PROMPT
         if message and message not in ("Compare these charts.", ""):
             prompt += f"\n\nAlso specifically address: {message}"
         return model.generate_content(["Chart 1:", image, "Chart 2:", image2, prompt]).text
 
-    # Find context image from history if none provided
     ctx_image = image
     if ctx_image is None:
         for msg in reversed(history):
@@ -373,7 +161,6 @@ def generate_response(
                 ctx_image = msg["image"]
                 break
 
-    # First analysis of a new single image → structured format
     is_first = image is not None and not any(m["role"] == "assistant" for m in history)
     if is_first:
         prompt = ANALYSIS_PROMPT
@@ -381,11 +168,7 @@ def generate_response(
             prompt += f"\n\nAlso specifically address: {message}"
         return model.generate_content([prompt, image]).text
 
-    # Conversational follow-up
-    parts = [
-        "You are an expert data analyst. Answer the user's questions about this chart concisely "
-        "and specifically, referencing values or patterns visible in the chart."
-    ]
+    parts = ["You are an expert data analyst. Answer the user's question about this chart concisely and specifically, referencing visible values or patterns."]
     if ctx_image:
         parts.append(ctx_image)
     for msg in history:
@@ -393,234 +176,135 @@ def generate_response(
     parts.append(f"User: {message}")
     return model.generate_content(parts).text
 
+def toggle_theme(key):
+    if st.button(C["theme_label"], key=key, type="secondary", use_container_width=True):
+        st.session_state["theme"] = C["next_theme"]
+        st.rerun()
 
-# ── State ──────────────────────────────────────────────────────────────────────
-if "messages" not in st.session_state:
-    st.session_state["messages"] = []
-if "upload_key" not in st.session_state:
-    st.session_state["upload_key"] = 0
-if "pending_image" not in st.session_state:
-    st.session_state["pending_image"] = None
-
-has_messages = bool(st.session_state["messages"])
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-#  LANDING PAGE
-# ══════════════════════════════════════════════════════════════════════════════
-if not has_messages:
-
-    # Theme toggle top-right
-    _, toggle_col = st.columns([10, 1])
-    with toggle_col:
-        if st.button(C["toggle_label"], key="toggle_land"):
-            st.session_state["theme"] = C["next_theme"]
-            st.rerun()
-
-    # Vertical spacer
-    st.markdown("<div style='height:14vh'></div>", unsafe_allow_html=True)
-
-    # Center column
-    _, center, _ = st.columns([1, 5, 1])
-    with center:
-
-        # Greeting
-        st.markdown(
-            f"<p style='font-family:Inter,sans-serif;font-size:1.05rem;color:{C['text_sub']};"
-            f"margin:0 0 6px 2px'>Hi there,</p>"
-            f"<h1>Where should we start?</h1>",
-            unsafe_allow_html=True,
-        )
-        st.markdown("<div style='height:1.75rem'></div>", unsafe_allow_html=True)
-
-        # ── Mode selector ──────────────────────────────────────────────────
-        mode = st.radio(
-            "mode",
-            ["Single Chart", "Compare Two Charts"],
-            horizontal=True,
-            label_visibility="collapsed",
-        )
-        st.markdown("<div style='height:0.75rem'></div>", unsafe_allow_html=True)
-
-        # ── Input card (form) ──────────────────────────────────────────────
-        with st.form("start_form", clear_on_submit=True):
-
-            if mode == "Single Chart":
-                uploaded = st.file_uploader(
-                    "Attach a chart",
-                    type=["png", "jpg", "jpeg", "webp"],
-                    label_visibility="collapsed",
-                    key="land_single",
-                )
-                uploaded2 = None
-                if uploaded:
-                    st.image(Image.open(uploaded), width=140)
-                placeholder = "Ask about your chart, or describe what to analyze…"
-
-            else:
-                uc1, uc2 = st.columns(2)
-                with uc1:
-                    st.markdown(
-                        f"<p style='font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;"
-                        f"color:{C['text_muted']};margin-bottom:6px'>Chart 1</p>",
-                        unsafe_allow_html=True,
-                    )
-                    uploaded = st.file_uploader(
-                        "Chart 1", type=["png", "jpg", "jpeg", "webp"],
-                        label_visibility="collapsed", key="land_cmp1",
-                    )
-                    if uploaded:
-                        st.image(Image.open(uploaded), use_container_width=True)
-                with uc2:
-                    st.markdown(
-                        f"<p style='font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;"
-                        f"color:{C['text_muted']};margin-bottom:6px'>Chart 2</p>",
-                        unsafe_allow_html=True,
-                    )
-                    uploaded2 = st.file_uploader(
-                        "Chart 2", type=["png", "jpg", "jpeg", "webp"],
-                        label_visibility="collapsed", key="land_cmp2",
-                    )
-                    if uploaded2:
-                        st.image(Image.open(uploaded2), use_container_width=True)
-                placeholder = "Ask a specific question about the comparison, or leave blank for a full analysis…"
-
-            msg_input = st.text_area(
-                "Message",
-                placeholder=placeholder,
-                height=80,
-                label_visibility="collapsed",
-            )
-
-            _, btn_col = st.columns([4, 1])
-            with btn_col:
-                btn_label = "Compare →" if mode == "Compare Two Charts" else "Send →"
-                submitted = st.form_submit_button(btn_label, use_container_width=True)
-
-        if submitted:
-            img1 = Image.open(uploaded) if uploaded else None
-            img2 = Image.open(uploaded2) if uploaded2 else None
-
-            if mode == "Compare Two Charts" and (not img1 or not img2):
-                st.warning("Please upload both charts to compare.")
-            elif mode == "Single Chart" and not img1 and not msg_input.strip():
-                st.warning("Upload a chart or type a message to get started.")
-            else:
-                message = msg_input.strip() or (
-                    "Compare these charts." if mode == "Compare Two Charts" else "Analyze this chart."
-                )
-                st.session_state["messages"].append(
-                    {"role": "user", "content": message, "image": img1, "image2": img2}
-                )
-                with st.spinner("Analyzing…"):
-                    response = generate_response(message, img1, [], image2=img2)
-                st.session_state["messages"].append(
-                    {"role": "assistant", "content": response, "image": None, "image2": None}
-                )
-                st.rerun()
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-#  CHAT PAGE
-# ══════════════════════════════════════════════════════════════════════════════
-else:
-
-    # App bar
-    bar_l, bar_r = st.columns([5, 2])
-    with bar_l:
-        st.markdown(
-            f"<p style='font-family:Cinzel,serif;font-size:0.9rem;letter-spacing:0.18em;"
-            f"text-transform:uppercase;color:{C['text']};margin:14px 0 0'>Chart Explainer AI</p>",
-            unsafe_allow_html=True,
-        )
-    with bar_r:
-        rc1, rc2 = st.columns(2)
-        with rc1:
-            if st.button("+ New Chat", key="new_chat"):
+def render_topbar(show_new_chat=False):
+    st.markdown('<div class="topbar"><span class="topbar-logo">Chart Explainer</span></div>', unsafe_allow_html=True)
+    if show_new_chat:
+        c1, c2 = st.columns([1, 1])
+        with c1:
+            if st.button("+ New chat", key="new_chat", type="secondary", use_container_width=True):
                 st.session_state["messages"] = []
                 st.session_state["pending_image"] = None
                 st.session_state["upload_key"] += 1
                 st.rerun()
-        with rc2:
-            if st.button(C["toggle_label"], key="toggle_chat"):
-                st.session_state["theme"] = C["next_theme"]
-                st.rerun()
+        with c2:
+            toggle_theme("toggle_chat")
+    else:
+        _, c = st.columns([5, 1])
+        with c:
+            toggle_theme("toggle_land")
 
-    st.markdown(
-        f"<div style='border-top:1px solid {C['border']};margin:0.5rem 0 1.5rem'></div>",
-        unsafe_allow_html=True,
-    )
+def open_image(uploaded_file):
+    if uploaded_file is None:
+        return None
+    img = Image.open(uploaded_file)
+    return img.copy()
 
-    # ── Conversation history ───────────────────────────────────────────────
+has_messages = bool(st.session_state["messages"])
+render_topbar(show_new_chat=has_messages)
+
+if not has_messages:
+    st.markdown("""
+<div class="landing-body">
+    <p class="landing-kicker">Hello! Let's get started —</p>
+    <h1 class="landing-headline">Upload a chart to analyze</h1>
+    <p class="landing-sub">I'll explain what it means in plain language.</p>
+</div>
+""", unsafe_allow_html=True)
+
+    mode = st.radio("mode", ["Single chart", "Compare two charts"], horizontal=True, label_visibility="collapsed")
+    st.markdown('<div class="landing-card">', unsafe_allow_html=True)
+    with st.form("start_form", clear_on_submit=True):
+        if mode == "Single chart":
+            uploaded = st.file_uploader("Drop or click to upload a chart", type=["png", "jpg", "jpeg", "webp"], label_visibility="collapsed", key="land_single")
+            uploaded2 = None
+            if uploaded:
+                st.markdown('<div class="preview-wrap">', unsafe_allow_html=True)
+                st.image(open_image(uploaded), use_container_width=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+            placeholder = "Any specific question? Optional — leave blank for a full analysis"
+        else:
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown('<p class="label-small">Chart 1</p>', unsafe_allow_html=True)
+                uploaded = st.file_uploader("Upload chart 1", type=["png", "jpg", "jpeg", "webp"], label_visibility="collapsed", key="land_cmp1")
+                if uploaded:
+                    st.image(open_image(uploaded), use_container_width=True)
+            with col2:
+                st.markdown('<p class="label-small">Chart 2</p>', unsafe_allow_html=True)
+                uploaded2 = st.file_uploader("Upload chart 2", type=["png", "jpg", "jpeg", "webp"], label_visibility="collapsed", key="land_cmp2")
+                if uploaded2:
+                    st.image(open_image(uploaded2), use_container_width=True)
+            placeholder = "Any specific question about the comparison? Optional"
+
+        st.markdown('<div class="card-divider"></div>', unsafe_allow_html=True)
+        msg_input = st.text_area("Message", placeholder=placeholder, height=68, label_visibility="collapsed")
+        bottom_l, bottom_r = st.columns([3, 1])
+        with bottom_l:
+            st.markdown('<span class="char-hint">Press Ctrl + Enter to submit</span>', unsafe_allow_html=True)
+        with bottom_r:
+            submitted = st.form_submit_button("Compare →" if mode == "Compare two charts" else "Analyze →", use_container_width=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sample-row"><span class="sample-label">Tip: try a bar, line, pie, scatter, or heatmap screenshot.</span></div>', unsafe_allow_html=True)
+
+    if submitted:
+        img1 = open_image(uploaded)
+        img2 = open_image(uploaded2)
+        if mode == "Compare two charts" and (not img1 or not img2):
+            st.warning("Please upload both charts to compare.")
+        elif mode == "Single chart" and not img1 and not msg_input.strip():
+            st.warning("Please upload a chart or type a message to get started.")
+        else:
+            message = msg_input.strip() or ("Compare these charts." if mode == "Compare two charts" else "Analyze this chart.")
+            st.session_state["messages"].append({"role": "user", "content": message, "image": img1, "image2": img2})
+            with st.spinner("Analyzing…"):
+                response = generate_response(message, img1, [], image2=img2)
+            st.session_state["messages"].append({"role": "assistant", "content": response, "image": None, "image2": None})
+            st.rerun()
+else:
     for msg in st.session_state["messages"]:
         with st.chat_message(msg["role"]):
             if msg.get("image") and msg.get("image2"):
-                ic1, ic2 = st.columns(2)
-                with ic1:
+                c1, c2 = st.columns(2)
+                with c1:
                     st.image(msg["image"], use_container_width=True)
-                with ic2:
+                with c2:
                     st.image(msg["image2"], use_container_width=True)
             elif msg.get("image"):
                 st.image(msg["image"], width=300)
             st.markdown(msg["content"])
 
-    # ── Attach new chart (compact, above chat input) ───────────────────────
-    st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
-    st.markdown(
-        f"<p style='font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;"
-        f"color:{C['text_muted']};margin-bottom:6px;font-family:Inter,sans-serif'>"
-        f"📎  Attach a new chart (optional)</p>",
-        unsafe_allow_html=True,
-    )
-    st.markdown('<div class="attach-area">', unsafe_allow_html=True)
+    st.markdown('<div class="attach-card"><p>📎 Attach a new chart optional</p>', unsafe_allow_html=True)
     attach_left, attach_right = st.columns([3, 2])
     with attach_left:
-        new_file = st.file_uploader(
-            "Attach",
-            type=["png", "jpg", "jpeg", "webp"],
-            key=f"chat_upload_{st.session_state['upload_key']}",
-            label_visibility="collapsed",
-        )
+        new_file = st.file_uploader("Attach", type=["png", "jpg", "jpeg", "webp"], key=f"chat_upload_{st.session_state['upload_key']}", label_visibility="collapsed")
     if new_file:
-        st.session_state["pending_image"] = Image.open(new_file)
+        st.session_state["pending_image"] = open_image(new_file)
         with attach_right:
             st.image(st.session_state["pending_image"], width=90)
-    elif not new_file:
+    else:
         st.session_state["pending_image"] = None
-    st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── Chat input ─────────────────────────────────────────────────────────
     if prompt := st.chat_input("Ask a follow-up question…"):
         current_img = st.session_state.get("pending_image")
         history = list(st.session_state["messages"])
-
-        st.session_state["messages"].append(
-            {"role": "user", "content": prompt, "image": current_img}
-        )
-
+        st.session_state["messages"].append({"role": "user", "content": prompt, "image": current_img, "image2": None})
         with st.chat_message("user"):
             if current_img:
                 st.image(current_img, width=300)
             st.markdown(prompt)
-
         with st.chat_message("assistant"):
             with st.spinner("Thinking…"):
                 response = generate_response(prompt, current_img, history)
             st.markdown(response)
-
-        st.session_state["messages"].append(
-            {"role": "assistant", "content": response, "image": None}
-        )
-
+        st.session_state["messages"].append({"role": "assistant", "content": response, "image": None, "image2": None})
         if current_img:
             st.session_state["pending_image"] = None
             st.session_state["upload_key"] += 1
 
-
-# ── Footer ─────────────────────────────────────────────────────────────────────
-st.markdown(
-    f"<p style='text-align:center;font-size:0.68rem;color:{C['text_muted']};"
-    f"letter-spacing:0.1em;font-family:Inter,sans-serif;margin-top:2rem'>"
-    f"GEMINI 2.5 FLASH  ·  FREE TIER: 1,500 REQUESTS / DAY</p>",
-    unsafe_allow_html=True,
-)
+st.markdown('<p class="footer-note">GEMINI 2.5 FLASH · STREAMLIT DEPLOY READY</p>', unsafe_allow_html=True)

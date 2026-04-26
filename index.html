@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chart Explainer AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+:root {
+  --bg:         #F8F6F1;
+  --surface:    #FFFFFF;
+  --surface2:   #F0EDE5;
+  --border:     #E3DED3;
+  --accent:     #B8751A;
+  --text:       #1C1A16;
+  --text-sub:   #6B6355;
+  --text-muted: #A8A090;
+  --btn-bg:     #1C1A16;
+  --btn-text:   #FFFFFF;
+  --shadow-sm:  0 1px 3px rgba(0,0,0,0.06);
+  --shadow-md:  0 4px 16px rgba(0,0,0,0.08);
+  --radius:     14px;
+  --radius-sm:  8px;
+}
+[data-theme="dark"] {
+  --bg:         #111110;
+  --surface:    #1A1917;
+  --surface2:   #222120;
+  --border:     #2E2C28;
+  --accent:     #C9913A;
+  --text:       #EDE9E0;
+  --text-sub:   #7A7060;
+  --text-muted: #4A4840;
+  --btn-bg:     #C9913A;
+  --btn-text:   #111110;
+  --shadow-sm:  0 1px 3px rgba(0,0,0,0.4);
+  --shadow-md:  0 4px 16px rgba(0,0,0,0.5);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; font-family: 'DM Sans', sans-serif; font-size: 16px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+body { background-color: var(--bg); color: var(--text); transition: background-color .25s, color .25s; }
+#root { height: 100%; }
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+.app-shell { display: flex; flex-direction: column; height: 100%; max-width: 720px; margin: 0 auto; padding: 0 24px; }
+/* Topbar */
+.topbar { display:flex; align-items:center; justify-content:space-between; padding:20px 0 16px; border-bottom:1px solid var(--border); flex-shrink:0; }
+.topbar-logo { font-family:'DM Serif Display',serif; font-size:1rem; letter-spacing:.02em; color:var(--text); }
+.topbar-actions { display:flex; align-items:center; gap:10px; }
+/* Theme toggle */
+.theme-toggle { display:flex; align-items:center; gap:8px; background:var(--surface2); border:1px solid var(--border); border-radius:99px; padding:6px 14px 6px 12px; cursor:pointer; font-family:'DM Sans',sans-serif; font-size:.8rem; font-weight:500; color:var(--text-sub); transition:all .2s; white-space:nowrap; user-select:none; }
+.theme-toggle:hover { border-color:var(--accent); color:var(--accent); }
+.toggle-icon { width:18px; height:18px; flex-shrink:0; }
+/* Buttons */
+.btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; font-family:'DM Sans',sans-serif; font-weight:500; font-size:.875rem; border-radius:var(--radius-sm); cursor:pointer; transition:all .2s; border:none; outline:none; white-space:nowrap; }
+.btn-primary { background:var(--btn-bg); color:var(--btn-text); padding:11px 22px; box-shadow:var(--shadow-sm); }
+.btn-primary:hover { opacity:.88; transform:translateY(-1px); box-shadow:var(--shadow-md); }
+.btn-primary:active { transform:none; }
+.btn-primary:disabled { opacity:.38; cursor:not-allowed; transform:none; }
+.btn-ghost { background:transparent; color:var(--text-sub); border:1px solid var(--border); padding:9px 18px; }
+.btn-ghost:hover { border-color:var(--accent); color:var(--accent); }
+.btn-sm { font-size:.8rem; padding:7px 14px; }
+/* Mode tabs */
+.mode-tabs { display:flex; background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:3px; gap:2px; }
+.mode-tab { flex:1; text-align:center; padding:9px 16px; border-radius:8px; font-size:.85rem; font-weight:500; cursor:pointer; transition:all .2s; color:var(--text-sub); border:none; background:transparent; font-family:'DM Sans',sans-serif; }
+.mode-tab.active { background:var(--surface); color:var(--text); box-shadow:var(--shadow-sm); }
+/* Upload */
+.upload-zone { border:1.5px dashed var(--border); border-radius:var(--radius); padding:28px 20px; text-align:center; cursor:pointer; transition:all .2s; position:relative; background:var(--surface); }
+.upload-zone:hover, .upload-zone.drag-over { border-color:var(--accent); background:color-mix(in srgb, var(--accent) 4%, var(--surface)); }
+.upload-zone input[type="file"] { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
+.upload-icon { margin-bottom:10px; display:flex; align-items:center; justify-content:center; color:var(--accent); opacity:.7; }
+.upload-label { font-size:.875rem; color:var(--text-sub); font-weight:500; }
+.upload-hint { font-size:.75rem; color:var(--text-muted); margin-top:4px; }
+.upload-preview { position:relative; border-radius:var(--radius); overflow:hidden; border:1px solid var(--border); background:var(--surface2); }
+.upload-preview img { width:100%; display:block; max-height:260px; object-fit:contain; background:var(--surface2); }
+.upload-preview-remove { position:absolute; top:8px; right:8px; background:var(--bg); border:1px solid var(--border); border-radius:99px; width:28px; height:28px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:.75rem; color:var(--text-sub); transition:all .2s; box-shadow:var(--shadow-sm); }
+.upload-preview-remove:hover { background:var(--surface); color:var(--text); }
+/* Textarea */
+textarea { width:100%; font-family:'DM Sans',sans-serif; font-size:.9rem; line-height:1.6; color:var(--text); background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; resize:none; outline:none; transition:border-color .2s, background .2s, color .2s; }
+textarea::placeholder { color:var(--text-muted); }
+textarea:focus { border-color:var(--accent); }
+/* Messages */
+.messages-scroll { flex:1; overflow-y:auto; padding:20px 0; }
+.message-row { display:flex; gap:12px; margin-bottom:20px; }
+.message-row.user { flex-direction:row-reverse; }
+.avatar { width:34px; height:34px; border-radius:99px; display:flex; align-items:center; justify-content:center; font-size:.85rem; flex-shrink:0; font-weight:600; }
+.avatar-user { background:var(--accent); color:var(--btn-text); }
+.avatar-ai { background:var(--surface2); color:var(--text-sub); border:1px solid var(--border); }
+.message-bubble { max-width:80%; padding:13px 16px; border-radius:14px; font-size:.875rem; line-height:1.75; }
+.message-bubble.user { background:var(--btn-bg); color:var(--btn-text); border-radius:14px 4px 14px 14px; }
+.message-bubble.ai { background:var(--surface); border:1px solid var(--border); color:var(--text); border-radius:4px 14px 14px 14px; }
+.message-image { margin-bottom:10px; border-radius:10px; overflow:hidden; border:1px solid var(--border); }
+.message-image img { width:100%; max-width:280px; display:block; object-fit:contain; background:var(--surface2); }
+/* Typing */
+.typing-dots { display:flex; align-items:center; gap:5px; padding:4px 0; }
+.typing-dots span { width:7px; height:7px; border-radius:50%; background:var(--text-muted); animation:bounce 1.2s infinite ease-in-out; }
+.typing-dots span:nth-child(2) { animation-delay:.2s; }
+.typing-dots span:nth-child(3) { animation-delay:.4s; }
+@keyframes bounce { 0%,60%,100%{transform:translateY(0);opacity:.5} 30%{transform:translateY(-5px);opacity:1} }
+/* Chat input */
+.chat-input-bar { border-top:1px solid var(--border); padding:14px 0 18px; flex-shrink:0; }
+.chat-input-row { display:flex; align-items:flex-end; gap:10px; background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:10px 12px 10px 16px; transition:border-color .2s; }
+.chat-input-row:focus-within { border-color:var(--accent); }
+.chat-input-row textarea { border:none; border-radius:0; padding:2px 0; font-size:.875rem; background:transparent; flex:1; min-height:24px; max-height:120px; overflow-y:auto; transition:none; }
+.chat-input-row textarea:focus { border:none; }
+.chat-send-btn { width:36px; height:36px; border-radius:10px; background:var(--btn-bg); color:var(--btn-text); border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:all .2s; }
+.chat-send-btn:hover { opacity:.85; }
+.chat-send-btn:disabled { opacity:.35; cursor:not-allowed; }
+.chat-attach-btn { width:36px; height:36px; border-radius:10px; background:transparent; color:var(--text-muted); border:1px solid var(--border); cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:all .2s; position:relative; overflow:hidden; }
+.chat-attach-btn input[type="file"] { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
+.chat-attach-btn:hover { border-color:var(--accent); color:var(--accent); }
+/* Pending attach */
+.pending-attach { display:flex; align-items:center; gap:10px; padding:8px 12px; background:var(--surface2); border:1px solid var(--border); border-radius:10px; margin-bottom:10px; font-size:.8rem; color:var(--text-sub); }
+.pending-attach img { width:40px; height:40px; border-radius:6px; object-fit:cover; border:1px solid var(--border); }
+.pending-attach-name { flex:1; font-weight:500; color:var(--text); }
+.pending-attach-remove { cursor:pointer; color:var(--text-muted); padding:2px 6px; border-radius:4px; transition:color .2s; }
+.pending-attach-remove:hover { color:var(--text); }
+/* Landing */
+.landing-body { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:40px 0 80px; }
+.landing-headline { font-family:'DM Serif Display',serif; font-size:2.4rem; color:var(--text); line-height:1.15; margin-bottom:8px; text-align:center; }
+.landing-sub { font-size:1rem; color:var(--text-sub); text-align:center; margin-bottom:36px; }
+.landing-card { width:100%; background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:24px; box-shadow:var(--shadow-md); display:flex; flex-direction:column; gap:16px; }
+.label-small { font-size:.72rem; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--text-muted); }
+.card-divider { height:1px; background:var(--border); margin:0 -24px; }
+.form-row-bottom { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.char-hint { font-size:.75rem; color:var(--text-muted); padding-top:4px; }
+/* Sample charts */
+.sample-row { display:flex; align-items:center; gap:8px; margin-top:24px; flex-wrap:wrap; }
+.sample-label { font-size:.75rem; color:var(--text-muted); font-weight:500; letter-spacing:.04em; }
+.sample-thumb { width:48px; height:36px; border-radius:6px; object-fit:cover; border:1px solid var(--border); cursor:pointer; transition:all .2s; opacity:.7; }
+.sample-thumb:hover { opacity:1; border-color:var(--accent); transform:scale(1.05); }
+/* Banner */
+.banner { background:color-mix(in srgb, var(--accent) 10%, var(--surface)); border:1px solid color-mix(in srgb, var(--accent) 30%, transparent); border-radius:var(--radius-sm); padding:10px 14px; font-size:.82rem; color:var(--accent); display:flex; align-items:center; gap:8px; }
+/* Markdown */
+.md-content h1,.md-content h2,.md-content h3 { font-weight:600; color:var(--text); margin-bottom:6px; margin-top:14px; font-size:.9rem; }
+.md-content h1:first-child,.md-content h2:first-child,.md-content h3:first-child { margin-top:0; }
+.md-content p { margin-bottom:8px; }
+.md-content p:last-child { margin-bottom:0; }
+.md-content ul,.md-content ol { padding-left:18px; margin-bottom:8px; }
+.md-content li { margin-bottom:3px; }
+.md-content strong { color:var(--accent); font-weight:600; }
+.md-content hr { border:none; border-top:1px solid var(--border); margin:10px 0; }
+@keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+.fade-in { animation:fadeUp .3s ease forwards; }
+@media(max-width:600px){ .app-shell{padding:0 16px} .landing-headline{font-size:2rem} .message-bubble{max-width:92%} }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+/* Markdown renderer */
+function renderMarkdown(text) {
+  if (!text) return '';
+  let html = text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,'<em>$1</em>')
+    .replace(/^### (.+)$/gm,'<h3>$1</h3>')
+    .replace(/^## (.+)$/gm,'<h2>$1</h2>')
+    .replace(/^# (.+)$/gm,'<h1>$1</h1>')
+    .replace(/^---$/gm,'<hr/>')
+    .replace(/^- (.+)$/gm,'<li>$1</li>')
+    .replace(/(<li>.*<\/li>)/gs,m=>`<ul>${m}</ul>`)
+    .replace(/\n\n/g,'</p><p>')
+    .replace(/\n/g,'<br/>');
+  return `<p>${html}</p>`;
+}
+
+/* Theme */
+function useTheme() {
+  const [theme, setTheme] = useState(() => localStorage.getItem('ce-theme') || 'light');
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    document.body.setAttribute('data-theme', theme);
+    document.body.style.backgroundColor = theme === 'dark' ? '#111110' : '#F8F6F1';
+    document.body.style.color = theme === 'dark' ? '#EDE9E0' : '#1C1A16';
+    localStorage.setItem('ce-theme', theme);
+  }, [theme]);
+  const toggle = () => setTheme(t => t === 'light' ? 'dark' : 'light');
+  return [theme, toggle];
+}
+
+/* Icons */
+const IconChart = () => (
+  <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+    <rect x="2" y="16" width="5" height="10" rx="1" fill="currentColor" opacity="0.4"/>
+    <rect x="9" y="10" width="5" height="16" rx="1" fill="currentColor" opacity="0.65"/>
+    <rect x="16" y="5" width="5" height="21" rx="1" fill="currentColor" opacity="0.9"/>
+    <rect x="23" y="12" width="5" height="14" rx="1" fill="currentColor" opacity="0.55"/>
+  </svg>
+);
+
+const IconMoon = () => (
+  <svg className="toggle-icon" viewBox="0 0 18 18" fill="none">
+    <path d="M15 10.5A6 6 0 017.5 3a6.5 6.5 0 100 12A6 6 0 0115 10.5z" fill="currentColor"/>
+  </svg>
+);
+
+const IconSun = () => (
+  <svg className="toggle-icon" viewBox="0 0 18 18" fill="none">
+    <circle cx="9" cy="9" r="3.5" fill="currentColor"/>
+    <path d="M9 1v2M9 15v2M1 9h2M15 9h2M3.22 3.22l1.41 1.41M13.37 13.37l1.41 1.41M3.22 14.78l1.41-1.41M13.37 4.63l1.41-1.41" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+  </svg>
+);
+
+const IconAttach = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+    <path d="M13 5L6.5 11.5C5.67 12.33 4.33 12.33 3.5 11.5C2.67 10.67 2.67 9.33 3.5 8.5L10.5 1.5C11 1 11.83 1 12.33 1.5C12.83 2 12.83 2.83 12.33 3.33L5.5 10.17C5.22 10.44 4.78 10.44 4.5 10.17C4.22 9.89 4.22 9.44 4.5 9.17L10.5 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+  </svg>
+);
+
+const IconSend = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+    <path d="M8 13V3M3 8l5-5 5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+const IconClose = () => (
+  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+    <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+  </svg>
+);
+
+/* Upload zone */
+function UploadZone({ onFile, label = "Drop or click to upload a chart" }) {
+  const [drag, setDrag] = useState(false);
+  const onDrop = e => {
+    e.preventDefault(); setDrag(false);
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) onFile(file);
+  };
+  return (
+    <div
+      className={`upload-zone${drag ? ' drag-over' : ''}`}
+      onDragOver={e => { e.preventDefault(); setDrag(true); }}
+      onDragLeave={() => setDrag(false)}
+      onDrop={onDrop}
+    >
+      <input type="file" accept="image/*" onChange={e => e.target.files[0] && onFile(e.target.files[0])} />
+      <div className="upload-icon"><IconChart /></div>
+      <div className="upload-label">{label}</div>
+      <div className="upload-hint">PNG, JPG, WEBP &middot; any size</div>
+    </div>
+  );
+}
+
+function ImagePreview({ src, onRemove }) {
+  return (
+    <div className="upload-preview">
+      <img src={src} alt="Chart preview" />
+      <button className="upload-preview-remove" onClick={onRemove} title="Remove"><IconClose /></button>
+    </div>
+  );
+}
+
+function fileToDataURL(file) {
+  return new Promise(resolve => {
+    const r = new FileReader();
+    r.onload = e => resolve(e.target.result);
+    r.readAsDataURL(file);
+  });
+}
+
+/* AI call */
+async function callAI(systemPrompt, messages) {
+  return window.claude.complete({ system: systemPrompt, messages });
+}
+
+/* Top bar */
+function TopBar({ theme, onToggle, showNewChat, onNewChat }) {
+  return (
+    <div className="topbar">
+      <span className="topbar-logo">Chart Explainer</span>
+      <div className="topbar-actions">
+        {showNewChat && (
+          <button className="btn btn-ghost btn-sm" onClick={onNewChat}>
+            + New chat
+          </button>
+        )}
+        <button className="theme-toggle" onClick={onToggle}>
+          {theme === 'light' ? <IconMoon /> : <IconSun />}
+          {theme === 'light' ? 'Dark mode' : 'Light mode'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* Landing */
+function Landing({ theme, onToggle, onSubmit }) {
+  const [mode, setMode] = useState('single');
+  const [img1, setImg1] = useState(null);
+  const [img2, setImg2] = useState(null);
+  const [question, setQuestion] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const SAMPLES = [
+    { src: 'sample_charts/bar_regional_sales.png', label: 'Bar chart' },
+    { src: 'sample_charts/line_revenue.png',       label: 'Line chart' },
+    { src: 'sample_charts/pie_market_share.png',   label: 'Pie chart' },
+    { src: 'sample_charts/scatter_marketing.png',  label: 'Scatter' },
+    { src: 'sample_charts/heatmap_satisfaction.png', label: 'Heatmap' },
+  ];
+
+  const loadFile = async (file) => {
+    const url = await fileToDataURL(file);
+    return { file, url };
+  };
+
+  const handleSample = async (src) => {
+    try {
+      const res = await fetch(src);
+      const blob = await res.blob();
+      const file = new File([blob], src.split('/').pop(), { type: blob.type });
+      setImg1(await loadFile(file));
+    } catch(e) {}
+  };
+
+  const handleSubmit = async () => {
+    setError('');
+    if (mode === 'compare' && (!img1 || !img2)) { setError('Please upload both charts to compare.'); return; }
+    if (mode === 'single' && !img1) { setError('Please upload a chart to get started.'); return; }
+    setLoading(true);
+    try { await onSubmit({ mode, img1, img2, question }); }
+    catch(e) { setError('Something went wrong. Please try again.'); }
+    setLoading(false);
+  };
+
+  const canSubmit = mode === 'single' ? !!img1 : (!!img1 && !!img2);
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', minHeight:'100vh' }}>
+      <div className="app-shell" style={{ flex:'0 0 auto' }}>
+        <TopBar theme={theme} onToggle={onToggle} showNewChat={false} />
+      </div>
+      <div className="app-shell" style={{ flex:1 }}>
+        <div className="landing-body">
+          <p style={{ fontSize:'.95rem', color:'var(--text-sub)', marginBottom:6, textAlign:'center' }}>
+            Hello! Let&apos;s get started &mdash;
+          </p>
+          <h1 className="landing-headline">Upload a chart to analyze</h1>
+          <p className="landing-sub">I&apos;ll explain what it means in plain language.</p>
+
+          <div className="mode-tabs" style={{ marginBottom:24, width:'100%', maxWidth:380 }}>
+            <button className={`mode-tab${mode==='single'?' active':''}`} onClick={() => { setMode('single'); setImg2(null); }}>
+              Single chart
+            </button>
+            <button className={`mode-tab${mode==='compare'?' active':''}`} onClick={() => setMode('compare')}>
+              Compare two charts
+            </button>
+          </div>
+
+          <div className="landing-card" style={{ maxWidth:580 }}>
+            {mode === 'single' ? (
+              img1
+                ? <ImagePreview src={img1.url} onRemove={() => setImg1(null)} />
+                : <UploadZone onFile={async f => setImg1(await loadFile(f))} />
+            ) : (
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                <div>
+                  <div className="label-small" style={{ marginBottom:8 }}>Chart 1</div>
+                  {img1 ? <ImagePreview src={img1.url} onRemove={() => setImg1(null)} /> : <UploadZone label="Upload chart 1" onFile={async f => setImg1(await loadFile(f))} />}
+                </div>
+                <div>
+                  <div className="label-small" style={{ marginBottom:8 }}>Chart 2</div>
+                  {img2 ? <ImagePreview src={img2.url} onRemove={() => setImg2(null)} /> : <UploadZone label="Upload chart 2" onFile={async f => setImg2(await loadFile(f))} />}
+                </div>
+              </div>
+            )}
+
+            <div className="card-divider" />
+
+            <textarea
+              rows={2}
+              placeholder={mode==='compare'
+                ? 'Any specific question about the comparison? (optional)'
+                : 'Any specific question? (optional — leave blank for a full analysis)'}
+              value={question}
+              onChange={e => setQuestion(e.target.value)}
+              onKeyDown={e => { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); if (canSubmit) handleSubmit(); } }}
+              style={{ border:'none', padding:'2px 0', background:'transparent', fontSize:'.875rem' }}
+            />
+
+            {error && <div className="banner">&#9888; {error}</div>}
+
+            <div className="form-row-bottom">
+              <span className="char-hint">Press Enter to send</span>
+              <button className="btn btn-primary" onClick={handleSubmit} disabled={!canSubmit || loading}>
+                {loading ? 'Analyzing…' : (mode==='compare' ? 'Compare →' : 'Analyze →')}
+              </button>
+            </div>
+          </div>
+
+          <div className="sample-row">
+            <span className="sample-label">Try a sample:</span>
+            {SAMPLES.map(s => (
+              <img key={s.src} src={s.src} alt={s.label} title={`Try: ${s.label}`}
+                className="sample-thumb" onClick={() => handleSample(s.src)} />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* Chat */
+function Chat({ theme, onToggle, initialMessages, onNewChat }) {
+  const [messages, setMessages] = useState(initialMessages);
+  const [input, setInput] = useState('');
+  const [pending, setPending] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const scrollRef = useRef(null);
+
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [messages, loading]);
+
+  const sendMessage = async (text, imgObj) => {
+    const userMsg = { role:'user', content: text || 'Analyze this chart.', imageDataUrl: imgObj?.url || null, imageUrl: imgObj?.url || null };
+    const history = messages.filter(m => m.role !== 'typing');
+    setMessages(prev => [...prev, userMsg, { role:'typing' }]);
+    setLoading(true);
+
+    let contextImage = imgObj?.url || null;
+    if (!contextImage) {
+      for (let i = history.length-1; i >= 0; i--) {
+        if (history[i].imageDataUrl) { contextImage = history[i].imageDataUrl; break; }
+      }
+    }
+
+    const systemPrompt = `You are a clear, friendly data analyst who explains charts to non-technical people. Answer concisely, referencing specific values. Use **bold** for section headers.`;
+
+    const userContent = [];
+    if (contextImage) {
+      userContent.push({ type:'image', source:{ type:'base64', media_type: contextImage.split(';')[0].split(':')[1], data: contextImage.split(',')[1] } });
+    }
+    userContent.push({ type:'text', text: text || 'Analyze this chart.' });
+
+    const msgs = [
+      ...history.map(m => ({
+        role: m.role,
+        content: m.role==='user' && m.imageDataUrl
+          ? [{ type:'image', source:{ type:'base64', media_type: m.imageDataUrl.split(';')[0].split(':')[1], data: m.imageDataUrl.split(',')[1] }}, { type:'text', text: m.content }]
+          : m.content
+      })),
+      { role:'user', content: userContent }
+    ];
+
+    try {
+      const response = await callAI(systemPrompt, msgs);
+      setMessages(prev => [...prev.filter(m=>m.role!=='typing'), { role:'assistant', content: response }]);
+    } catch(e) {
+      setMessages(prev => [...prev.filter(m=>m.role!=='typing'), { role:'assistant', content: "Sorry, I couldn't analyze that. Please try again." }]);
+    }
+    setLoading(false);
+  };
+
+  const handleSend = () => {
+    if (!input.trim() && !pending) return;
+    const text = input.trim();
+    const img = pending;
+    setInput(''); setPending(null);
+    sendMessage(text, img);
+  };
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', height:'100vh' }}>
+      <div className="app-shell" style={{ flex:1, display:'flex', flexDirection:'column', minHeight:0 }}>
+        <TopBar theme={theme} onToggle={onToggle} showNewChat={true} onNewChat={onNewChat} />
+
+        <div className="messages-scroll" ref={scrollRef}>
+          {messages.map((msg, i) => {
+            if (msg.role === 'typing') return (
+              <div key="typing" className="message-row fade-in">
+                <div className="avatar avatar-ai">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M7 1l1.5 4h4l-3.2 2.4 1.2 4L7 9l-3.5 2.4 1.2-4L1.5 5h4z" fill="currentColor"/>
+                  </svg>
+                </div>
+                <div className="message-bubble ai">
+                  <div className="typing-dots"><span/><span/><span/></div>
+                </div>
+              </div>
+            );
+            return (
+              <div key={i} className={`message-row${msg.role==='user'?' user':''}`}>
+                <div className={`avatar avatar-${msg.role==='user'?'user':'ai'}`}>
+                  {msg.role==='user' ? 'You' : (
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                      <path d="M7 1l1.5 4h4l-3.2 2.4 1.2 4L7 9l-3.5 2.4 1.2-4L1.5 5h4z" fill="currentColor"/>
+                    </svg>
+                  )}
+                </div>
+                <div className={`message-bubble ${msg.role==='user'?'user':'ai'}`}>
+                  {msg.imageUrl && (
+                    <div className="message-image"><img src={msg.imageUrl} alt="Chart" /></div>
+                  )}
+                  {msg.role==='assistant'
+                    ? <div className="md-content" dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }} />
+                    : <span>{msg.content}</span>
+                  }
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="chat-input-bar">
+          {pending && (
+            <div className="pending-attach">
+              <img src={pending.url} alt="Attached" />
+              <span className="pending-attach-name">{pending.file.name}</span>
+              <span className="pending-attach-remove" onClick={() => setPending(null)}>Remove</span>
+            </div>
+          )}
+          <div className="chat-input-row">
+            <button className="chat-attach-btn" title="Attach a new chart">
+              <IconAttach />
+              <input type="file" accept="image/*" onChange={async e => {
+                if (e.target.files[0]) {
+                  const url = await fileToDataURL(e.target.files[0]);
+                  setPending({ file: e.target.files[0], url });
+                  e.target.value = '';
+                }
+              }} />
+            </button>
+            <textarea
+              rows={1}
+              placeholder="Ask a follow-up question..."
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+              style={{ border:'none', padding:'6px 0', background:'transparent' }}
+            />
+            <button className="chat-send-btn" onClick={handleSend}
+              disabled={loading || (!input.trim() && !pending)} title="Send">
+              <IconSend />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* App */
+function App() {
+  const [theme, toggleTheme] = useTheme();
+  const [view, setView] = useState('landing');
+  const [chatMessages, setChatMessages] = useState([]);
+
+  const handleLandingSubmit = async ({ mode, img1, img2, question }) => {
+    const isCompare = mode === 'compare';
+    const userMsg = {
+      role: 'user',
+      content: question || (isCompare ? 'Compare these two charts.' : 'Analyze this chart.'),
+      imageDataUrl: img1?.url || null,
+      imageUrl: img1?.url || null,
+    };
+    setChatMessages([userMsg, { role:'typing' }]);
+    setView('chat');
+
+    let systemPrompt, messages;
+
+    if (isCompare) {
+      systemPrompt = `You are a clear, friendly data analyst comparing two charts for a non-technical audience. Use **bold** for section headers:
+
+**Chart 1 Summary** — what it shows and its main finding.
+**Chart 2 Summary** — what it shows and its main finding.
+**Key Similarities** — patterns both charts share.
+**Key Differences** — most important differences with specific values.
+**What this means** — one clear, practical conclusion.`;
+
+      const q = question || 'Compare these two charts.';
+      messages = [
+        { role:'user', content:[
+          { type:'image', source:{ type:'base64', media_type: img1.url.split(';')[0].split(':')[1], data: img1.url.split(',')[1] }},
+          { type:'text', text:'This is Chart 1.' }
+        ]},
+        { role:'assistant', content:'I can see Chart 1. Please share Chart 2.' },
+        { role:'user', content:[
+          { type:'image', source:{ type:'base64', media_type: img2.url.split(';')[0].split(':')[1], data: img2.url.split(',')[1] }},
+          { type:'text', text:`This is Chart 2. ${q}` }
+        ]}
+      ];
+    } else {
+      systemPrompt = `You are a clear, friendly data analyst explaining charts to non-technical people. Use **bold** for these section headers:
+
+**What it shows** — one sentence describing the chart.
+**Key Trend** — the main pattern with specific numbers.
+**Notable Detail** — one standout insight a casual reader might miss.
+**Takeaway** — one practical, actionable conclusion.`;
+
+      messages = [{ role:'user', content:[
+        { type:'image', source:{ type:'base64', media_type: img1.url.split(';')[0].split(':')[1], data: img1.url.split(',')[1] }},
+        { type:'text', text: question || 'Please analyze this chart.' }
+      ]}];
+    }
+
+    try {
+      const response = await callAI(systemPrompt, messages);
+      setChatMessages([userMsg, { role:'assistant', content: response }]);
+    } catch(e) {
+      setChatMessages([userMsg, { role:'assistant', content:"Sorry, I couldn't analyze that. Please check your connection and try again." }]);
+    }
+  };
+
+  if (view === 'landing') {
+    return <Landing theme={theme} onToggle={toggleTheme} onSubmit={handleLandingSubmit} />;
+  }
+  return (
+    <Chat
+      theme={theme}
+      onToggle={toggleTheme}
+      initialMessages={chatMessages}
+      onNewChat={() => { setChatMessages([]); setView('landing'); }}
+    />
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
